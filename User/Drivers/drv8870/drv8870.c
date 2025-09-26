@@ -74,26 +74,14 @@ static void start_soft_start(uint8_t motor_idx, int8_t target_percent) {
         return;
     }
     
-    // 检查是否为负载电机且主电机未启动
-    if (state->is_load_motor) {
-        SoftStartState_t* main_state = &g_soft_start[state->main_motor_idx];
-        if (!main_state->is_ramping && main_state->current_percent == 0) {
-            // 主电机未启动，不启动负载电机
-            return;
-        }
-    }
-    
     state->target_percent = target_percent;
     state->start_time = HAL_GetTick();
     state->is_ramping = 1;
     
     // 如果是负载电机，需要延迟启动
     if (state->is_load_motor) {
-        SoftStartState_t* main_state = &g_soft_start[state->main_motor_idx];
-        if (main_state->is_ramping) {
-            // 主电机正在启动，延迟负载电机启动
-            state->start_time += LOAD_DELAY_TIME_MS;
-        }
+        // 负载电机延迟启动
+        state->start_time += LOAD_DELAY_TIME_MS;
     }
     
     state->current_percent = 0;
@@ -239,18 +227,6 @@ void DRV8870_SoftStartUpdate(void) {
         // 更新PWM输出
         if (htims[i] != NULL) {
             pair_set_speed_immediate(htims[i], ch_in1s[i], ch_in2s[i], state->current_percent);
-        }
-        
-        // 如果是主电机刚启动，检查是否需要启动对应的负载电机
-        if (!state->is_load_motor && state->current_percent != 0) {
-            // 找到对应的负载电机并启动
-            uint8_t load_idx = (i == 0) ? 1 : (i == 2) ? 3 : 255;
-            if (load_idx < 4) {
-                SoftStartState_t* load_state = &g_soft_start[load_idx];
-                if (load_state->target_percent != 0 && !load_state->is_ramping) {
-                    start_soft_start(load_idx, load_state->target_percent);
-                }
-            }
         }
     }
 }
