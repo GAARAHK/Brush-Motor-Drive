@@ -63,8 +63,7 @@ void AT_MainLoopHandler(void) {
         AT_ProcessCommand(at_cmd_buffer);
     }
     
-    // 执行其他周期性任务
-    MotorCmd_PeriodicHandler();
+    // 注意：MotorCmd_PeriodicHandler在main.c中调用，避免重复调用
 }
 
 /**
@@ -339,6 +338,19 @@ AtCmdStatus_t AT_ProcessCommand(char *cmd) {
 		}
 		else if (strcmp(cmd_name, "MotorEnable") == 0) {
 			return MotorCmd_SetEnable(param_start);
+		}
+		// 电机对控制命令
+		else if (strcmp(cmd_name, "MotorPairRunRepeat") == 0) {
+			return MotorCmd_PairRunRepeat(param_start);
+		}
+		else if (strcmp(cmd_name, "MotorPairStopRepeat") == 0) {
+			return MotorCmd_PairStopRepeat(param_start);
+		}
+		else if (strcmp(cmd_name, "MotorPairRunCustom") == 0) {
+			return MotorCmd_PairRunCustom(param_start);
+		}
+		else if (strcmp(cmd_name, "MotorPairStopCustom") == 0) {
+			return MotorCmd_PairStopCustom(param_start);
 		}
 				
 		

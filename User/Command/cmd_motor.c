@@ -87,6 +87,9 @@ typedef struct {
 
 static StatusUpload_t g_status_upload[4] = {0};
 
+// 电机对控制状态 (2对: MTD1+MTD2, MTD3+MTD4)
+static MotorPairControl_t g_motor_pair[2] = {0};
+
 // 将毫秒转换为微秒
 static inline uint32_t ms_to_us(uint32_t ms) {
     return ms * 1000;
@@ -1310,7 +1313,366 @@ void MotorCmd_PeriodicHandler(void) {
 		
     } // 结束第一部分的电机控制循环
 
+    // 第二部分：处理电机对控制
+    for (uint8_t pair_idx = 0; pair_idx < 2; pair_idx++) {
+        MotorPairControl_t* pair = &g_motor_pair[pair_idx];
+        
+        if (!pair->is_running) continue;
+        
+        uint8_t main_motor_idx = pair_idx * 2;     // 0->0(MTD1), 1->2(MTD3)
+        uint8_t load_motor_idx = main_motor_idx + 1; // 0->1(MTD2), 1->3(MTD4)
+        
+        // 处理循环运行模式
+        if (pair->max_cycles > 0 || pair->current_cycle == 0) {
+            uint32_t elapsed = current_time - pair->last_switch_time;
+            uint8_t state_changed = 0;
+            
+            // 状态机处理
+            switch(pair->current_state) {
+                case 0: // 正在正转
+                    if (elapsed >= pair->cw_time_ms) {
+                        // 切换到正转停止状态
+                        Motor_SetState(main_motor_idx, MOTOR_DIR_STOP, 0);
+                        Motor_SetState(load_motor_idx, MOTOR_DIR_STOP, 0);
+                        pair->current_state = 1;
+                        pair->last_switch_time = current_time;
+                        state_changed = 1;
+                    }
+                    break;
+                    
+                case 1: // 正转停止状态
+                    if (elapsed >= pair->cw_stop_time_ms) {
+                        // 切换到反转状态
+                        Motor_SetState(main_motor_idx, MOTOR_DIR_CCW, pair->pwm);
+                        Motor_SetState(load_motor_idx, MOTOR_DIR_CCW, pair->pwm);
+                        pair->current_state = 2;
+                        pair->last_switch_time = current_time;
+                        state_changed = 1;
+                    }
+                    break;
+                    
+                case 2: // 正在反转
+                    if (elapsed >= pair->ccw_time_ms) {
+                        // 切换到反转停止状态
+                        Motor_SetState(main_motor_idx, MOTOR_DIR_STOP, 0);
+                        Motor_SetState(load_motor_idx, MOTOR_DIR_STOP, 0);
+                        pair->current_state = 3;
+                        pair->last_switch_time = current_time;
+                        state_changed = 1;
+                    }
+                    break;
+                    
+                case 3: // 反转停止状态
+                    if (elapsed >= pair->ccw_stop_time_ms) {
+                        // 完成一个循环
+                        pair->current_cycle++;
+                        
+                        // 检查是否达到最大循环次数
+                        if (pair->max_cycles > 0 && pair->current_cycle >= pair->max_cycles) {
+                            // 停止运行
+                            pair->is_running = 0;
+                            Motor_SetState(main_motor_idx, MOTOR_DIR_STOP, 0);
+                            Motor_SetState(load_motor_idx, MOTOR_DIR_STOP, 0);
+                        } else {
+                            // 开始新的循环
+                            Motor_SetState(main_motor_idx, MOTOR_DIR_CW, pair->pwm);
+                            Motor_SetState(load_motor_idx, MOTOR_DIR_CW, pair->pwm);
+                            pair->current_state = 0;
+                            pair->last_switch_time = current_time;
+                            state_changed = 1;
+                        }
+                    }
+                    break;
+            }
+        }
+        
+        // 处理自定义运行模式
+        if (pair->phase_count > 0) {
+            uint32_t elapsed = current_time - pair->cycle_start_time;
+            
+            // 检查是否完成一个周期
+            if (elapsed >= pair->total_period_ms) {
+                // 完成一个周期
+                pair->current_cycle++;
+                
+                // 检查是否达到最大循环次数
+                if (pair->max_cycles > 0 && pair->current_cycle >= pair->max_cycles) {
+                    // 已完成所有循环，停止运行
+                    pair->is_running = 0;
+                    Motor_SetState(main_motor_idx, MOTOR_DIR_STOP, 0);
+                    Motor_SetState(load_motor_idx, MOTOR_DIR_STOP, 0);
+                } else {
+                    // 开始新周期
+                    pair->cycle_start_time = current_time;
+                    pair->current_phase = 0;
+                    
+                    // 设置初始阶段的电机状态
+                    MotorPhase_t *first_phase = &pair->phases[0];
+                    Motor_SetState(main_motor_idx, first_phase->direction, first_phase->pwm);
+                    Motor_SetState(load_motor_idx, first_phase->direction, first_phase->pwm);
+                }
+            } else {
+                // 检查是否需要切换到下一个阶段
+                uint8_t current_phase = pair->current_phase;
+                uint8_t next_phase = current_phase + 1;
+                
+                if (next_phase < pair->phase_count) {
+                    uint32_t next_phase_start = pair->phases[next_phase].start_time_ms;
+                    
+                    if (elapsed >= next_phase_start) {
+                        // 切换到下一个阶段
+                        pair->current_phase = next_phase;
+                        MotorPhase_t *phase = &pair->phases[next_phase];
+                        Motor_SetState(main_motor_idx, phase->direction, phase->pwm);
+                        Motor_SetState(load_motor_idx, phase->direction, phase->pwm);
+                    }
+                }
+            }
+        }
+    } // 结束电机对控制循环
     
+}
+
+// 电机对循环运行命令: AT+MotorPairRunRepeat=设备ID,电机对ID,PWM,正转时间,正转停止时间,反转时间,反转停止时间,循环总次数
+AtCmdStatus_t MotorCmd_PairRunRepeat(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 解析参数
+    int dev_id, pair_id, pwm, cw_time, cw_stop_time, ccw_time, ccw_stop_time, max_cycles;
+    if (sscanf(params, "%d,%d,%d,%d,%d,%d,%d,%d", 
+               &dev_id, &pair_id, &pwm, &cw_time, &cw_stop_time, &ccw_time, &ccw_stop_time, &max_cycles) != 8) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证设备ID
+    if (dev_id != g_device_id) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证电机对ID (1 or 2)
+    if (pair_id < 1 || pair_id > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证参数范围
+    if (pwm < -100 || pwm > 100 || cw_time < 0 || cw_stop_time < 0 || 
+        ccw_time < 0 || ccw_stop_time < 0 || max_cycles < 0) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_id - 1;
+    MotorPairControl_t* pair = &g_motor_pair[pair_idx];
+    
+    // 停止之前的运行
+    pair->is_running = 0;
+    
+    // 设置新的循环运行参数
+    pair->pair_id = pair_id;
+    pair->pwm = pwm;
+    pair->cw_time_ms = cw_time;
+    pair->cw_stop_time_ms = cw_stop_time;
+    pair->ccw_time_ms = ccw_time;
+    pair->ccw_stop_time_ms = ccw_stop_time;
+    pair->max_cycles = max_cycles;
+    pair->current_cycle = 0;
+    pair->current_state = 0;
+    pair->phase_count = 0; // 清除自定义模式
+    
+    // 启动循环运行
+    pair->is_running = 1;
+    pair->start_time = HAL_GetTick();
+    pair->last_switch_time = pair->start_time;
+    
+    // 开始正转
+    uint8_t main_motor_idx = pair_idx * 2;
+    uint8_t load_motor_idx = main_motor_idx + 1;
+    Motor_SetState(main_motor_idx, MOTOR_DIR_CW, pwm);
+    Motor_SetState(load_motor_idx, MOTOR_DIR_CW, pwm);
+    
+    // 返回确认信息
+    AT_SendResponse("AT+MotorPairRunRepeat=%d,%d,%d,%d,%d,%d,%d,%d",
+                   dev_id, pair_id, pwm, cw_time, cw_stop_time, ccw_time, ccw_stop_time, max_cycles);
+    
+    return AT_OK;
+}
+
+// 停止电机对循环运行命令: AT+MotorPairStopRepeat=设备ID,电机对ID
+AtCmdStatus_t MotorCmd_PairStopRepeat(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 解析参数
+    int dev_id, pair_id;
+    if (sscanf(params, "%d,%d", &dev_id, &pair_id) != 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证设备ID
+    if (dev_id != g_device_id) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证电机对ID (1 or 2)
+    if (pair_id < 1 || pair_id > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_id - 1;
+    MotorPairControl_t* pair = &g_motor_pair[pair_idx];
+    
+    // 停止运行
+    pair->is_running = 0;
+    
+    // 停止电机
+    uint8_t main_motor_idx = pair_idx * 2;
+    uint8_t load_motor_idx = main_motor_idx + 1;
+    Motor_SetState(main_motor_idx, MOTOR_DIR_STOP, 0);
+    Motor_SetState(load_motor_idx, MOTOR_DIR_STOP, 0);
+    
+    // 返回确认信息
+    AT_SendResponse("AT+MotorPairStopRepeat=%d,%d", dev_id, pair_id);
+    
+    return AT_OK;
+}
+
+// 电机对自定义运行命令: AT+MotorPairRunCustom=设备ID,电机对ID,总周期时间,循环次数,阶段数,阶段1开始时间,阶段1方向,阶段1PWM,...
+AtCmdStatus_t MotorCmd_PairRunCustom(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 解析基础参数
+    int dev_id, pair_id, total_period, repeat_count, phase_count;
+    int result = sscanf(params, "%d,%d,%d,%d,%d", 
+                       &dev_id, &pair_id, &total_period, &repeat_count, &phase_count);
+    
+    if (result != 5) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证设备ID
+    if (dev_id != g_device_id) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证电机对ID (1 or 2)
+    if (pair_id < 1 || pair_id > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证阶段数
+    if (phase_count < 1 || phase_count > MAX_MOTOR_PAIR_PHASES) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_id - 1;
+    MotorPairControl_t* pair = &g_motor_pair[pair_idx];
+    
+    // 停止之前的运行
+    pair->is_running = 0;
+    
+    // 设置基础参数
+    pair->pair_id = pair_id;
+    pair->total_period_ms = total_period;
+    pair->max_cycles = repeat_count;
+    pair->phase_count = phase_count;
+    pair->current_cycle = 0;
+    pair->current_phase = 0;
+    
+    // 解析阶段参数
+    const char* phase_params = params;
+    // 跳过前5个参数
+    for (int i = 0; i < 5; i++) {
+        phase_params = strchr(phase_params, ',');
+        if (phase_params == NULL) {
+            return AT_PARAM_ERROR;
+        }
+        phase_params++;
+    }
+    
+    // 解析每个阶段的参数
+    for (uint8_t i = 0; i < phase_count; i++) {
+        int start_time, direction, pwm;
+        if (sscanf(phase_params, "%d,%d,%d", &start_time, &direction, &pwm) != 3) {
+            return AT_PARAM_ERROR;
+        }
+        
+        pair->phases[i].start_time_ms = start_time;
+        pair->phases[i].direction = (MotorDirection_t)direction;
+        pair->phases[i].pwm = pwm;
+        
+        // 移动到下一组参数
+        if (i < phase_count - 1) {
+            for (int j = 0; j < 3; j++) {
+                phase_params = strchr(phase_params, ',');
+                if (phase_params == NULL) {
+                    return AT_PARAM_ERROR;
+                }
+                phase_params++;
+            }
+        }
+    }
+    
+    // 启动自定义运行
+    pair->is_running = 1;
+    pair->start_time = HAL_GetTick();
+    pair->cycle_start_time = pair->start_time;
+    
+    // 设置初始阶段的电机状态
+    MotorPhase_t *first_phase = &pair->phases[0];
+    uint8_t main_motor_idx = pair_idx * 2;
+    uint8_t load_motor_idx = main_motor_idx + 1;
+    Motor_SetState(main_motor_idx, first_phase->direction, first_phase->pwm);
+    Motor_SetState(load_motor_idx, first_phase->direction, first_phase->pwm);
+    
+    // 返回确认信息
+    AT_SendResponse("AT+MotorPairRunCustom=%d,%d,%d,%d,%d",
+                   dev_id, pair_id, total_period, repeat_count, phase_count);
+    
+    return AT_OK;
+}
+
+// 停止电机对自定义运行命令: AT+MotorPairStopCustom=设备ID,电机对ID
+AtCmdStatus_t MotorCmd_PairStopCustom(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 解析参数
+    int dev_id, pair_id;
+    if (sscanf(params, "%d,%d", &dev_id, &pair_id) != 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证设备ID
+    if (dev_id != g_device_id) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证电机对ID (1 or 2)
+    if (pair_id < 1 || pair_id > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_id - 1;
+    MotorPairControl_t* pair = &g_motor_pair[pair_idx];
+    
+    // 停止运行
+    pair->is_running = 0;
+    
+    // 停止电机
+    uint8_t main_motor_idx = pair_idx * 2;
+    uint8_t load_motor_idx = main_motor_idx + 1;
+    Motor_SetState(main_motor_idx, MOTOR_DIR_STOP, 0);
+    Motor_SetState(load_motor_idx, MOTOR_DIR_STOP, 0);
+    
+    // 返回确认信息
+    AT_SendResponse("AT+MotorPairStopCustom=%d,%d", dev_id, pair_id);
+    
+    return AT_OK;
 }
 
 // 函数结束
