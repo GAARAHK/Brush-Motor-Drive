@@ -15,7 +15,12 @@
 #define FIRMWARE_VERSION "V1.1.0"  // 固件版本号
 
 // 在全局变量区
+// 在现有的全局变量后添加电机对控制变量
+// 电机对循环运行状态 (支持两对电机)
+static MotorPairControl_t g_motor_pair_repeat[2] = {0};
 
+// 电机对自定义运行状态 (支持两对电机)  
+static MotorPairCustom_t g_motor_pair_custom[2] = {0};
 
 // 全局速度传感器实例
 SpeedSensor_t g_speed_sensors[4];
@@ -215,6 +220,61 @@ static void Motor_SendStatus(uint8_t motor_idx) {
                    status.hw_version);
 }
 
+
+// 添加在现有的Motor_SetState函数后
+// 设置电机对状态（支持延时加载）
+static void MotorPair_SetState(uint8_t pair_idx, MotorDirection_t main_dir, uint16_t main_pwm, uint16_t load_pwm, uint8_t apply_load_immediately) {
+    if (pair_idx >= 2) return;
+    
+    uint8_t main_motor_idx = pair_idx * 2;     // 0或2 (1号或3号电机)
+    uint8_t load_motor_idx = pair_idx * 2 + 1; // 1或3 (2号或4号电机)
+    
+    int8_t main_speed = 0;
+    int8_t load_speed = 0;
+    
+    // 主电机控制
+    if (main_dir == MOTOR_DIR_CW) {
+        main_speed = (main_pwm * 100) / 10000;
+    } else if (main_dir == MOTOR_DIR_CCW) {
+        main_speed = -((main_pwm * 100) / 10000);
+    }
+    
+    // 负载电机控制（只在需要立即应用或已过延时时才施加负载）
+    if (apply_load_immediately && load_pwm > 0) {
+        load_speed = (load_pwm * 100) / 10000;
+    }
+    
+    // 应用到对应的电机
+    switch (main_motor_idx) {
+        case 0: MTD1_SetSpeedPercent(main_speed); break;
+        case 2: MTD3_SetSpeedPercent(main_speed); break;
+    }
+    
+    switch (load_motor_idx) {
+        case 1: MTD2_SetSpeedPercent(load_speed); break;
+        case 3: MTD4_SetSpeedPercent(load_speed); break;
+    }
+}
+
+// 单独应用负载到电机对
+static void MotorPair_ApplyLoad(uint8_t pair_idx, uint16_t load_pwm) {
+    if (pair_idx >= 2) return;
+    
+    uint8_t load_motor_idx = pair_idx * 2 + 1; // 1或3 (2号或4号电机)
+    int8_t load_speed = 0;
+    
+    if (load_pwm > 0) {
+        load_speed = (load_pwm * 100) / 10000;
+    }
+    
+    switch (load_motor_idx) {
+        case 1: MTD2_SetSpeedPercent(load_speed); break;
+        case 3: MTD4_SetSpeedPercent(load_speed); break;
+    }
+}
+
+
+/***********************************命令处理函数*****************************************************/
 // AT+MotorRun 命令处理
 AtCmdStatus_t MotorCmd_Run(const char *params) {
     if (params == NULL) {
@@ -1124,6 +1184,240 @@ AtCmdStatus_t MotorCmd_SetEnable(const char *params) {
 }
 
 
+
+
+/********************************成对的电机控制*****************************************/
+// 添加电机对循环运行命令处理（支持负载延时）
+AtCmdStatus_t MotorCmd_PairRunRepeat(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    int dev_id, pair_num, main_pwm, load_pwm_cw, load_pwm_ccw, load_delay_ms;
+    int cw_time_us, cw_stop_time_us, ccw_time_us, ccw_stop_time_us, total_cycles;
+    
+    // 解析参数: 设备ID,电机对号,主电机PWM,正转负载PWM,反转负载PWM,负载延时(ms),正转时间,正转停止时间,反转时间,反转停止时间,循环次数
+    if (sscanf(params, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &dev_id, &pair_num, &main_pwm, 
+               &load_pwm_cw, &load_pwm_ccw, &load_delay_ms, &cw_time_us, &cw_stop_time_us, 
+               &ccw_time_us, &ccw_stop_time_us, &total_cycles) != 11) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证设备ID
+    if (dev_id != g_device_id) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证电机对号 (1或2)
+    if (pair_num < 1 || pair_num > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证PWM参数
+    if (main_pwm < 0 || main_pwm > 10000) {
+        main_pwm = main_pwm < 0 ? 0 : 10000;
+    }
+    if (load_pwm_cw < 0 || load_pwm_cw > 10000) {
+        load_pwm_cw = load_pwm_cw < 0 ? 0 : 10000;
+    }
+    if (load_pwm_ccw < 0 || load_pwm_ccw > 10000) {
+        load_pwm_ccw = load_pwm_ccw < 0 ? 0 : 10000;
+    }
+    
+    // 验证延时参数（默认1秒）
+    if (load_delay_ms < 0) {
+        load_delay_ms = 1000;  // 默认1秒延时
+    }
+    
+    // 获取电机对索引 (0-1)
+    uint8_t pair_idx = pair_num - 1;
+    
+    // 停止之前的运行
+    g_motor_pair_repeat[pair_idx].is_running = 0;
+    
+    // 设置循环运行参数
+    g_motor_pair_repeat[pair_idx].device_id = dev_id;
+    g_motor_pair_repeat[pair_idx].pair_num = pair_num;
+    g_motor_pair_repeat[pair_idx].main_pwm = main_pwm;
+    g_motor_pair_repeat[pair_idx].load_pwm_cw = load_pwm_cw;
+    g_motor_pair_repeat[pair_idx].load_pwm_ccw = load_pwm_ccw;
+    g_motor_pair_repeat[pair_idx].load_delay_ms = load_delay_ms;
+    g_motor_pair_repeat[pair_idx].cw_time_ms = us_to_ms(cw_time_us);
+    g_motor_pair_repeat[pair_idx].cw_stop_time_ms = us_to_ms(cw_stop_time_us);
+    g_motor_pair_repeat[pair_idx].ccw_time_ms = us_to_ms(ccw_time_us);
+    g_motor_pair_repeat[pair_idx].ccw_stop_time_ms = us_to_ms(ccw_stop_time_us);
+    g_motor_pair_repeat[pair_idx].max_cycles = total_cycles;
+    g_motor_pair_repeat[pair_idx].current_cycle = 0;
+    g_motor_pair_repeat[pair_idx].current_state = 0; // 开始正转
+    g_motor_pair_repeat[pair_idx].current_dir = MOTOR_DIR_CW;
+    g_motor_pair_repeat[pair_idx].last_switch_time = HAL_GetTick();
+    g_motor_pair_repeat[pair_idx].load_apply_time = HAL_GetTick() + load_delay_ms;
+    g_motor_pair_repeat[pair_idx].load_applied = 0;
+    g_motor_pair_repeat[pair_idx].is_running = 1;
+    
+    // 启动第一阶段：正转（不立即施加负载）
+    MotorPair_SetState(pair_idx, MOTOR_DIR_CW, main_pwm, load_pwm_cw, 0);
+    
+    // 发送开始消息
+    AT_SendResponse("AT+MotorPairRunRepeat=%d,%d,1,%d,%d,%d,%d,%d,%d,%d,%d,%d,0",
+                   dev_id, pair_num, main_pwm, load_pwm_cw, load_pwm_ccw, load_delay_ms,
+                   ms_to_us(g_motor_pair_repeat[pair_idx].cw_time_ms),
+                   ms_to_us(g_motor_pair_repeat[pair_idx].cw_stop_time_ms),
+                   ms_to_us(g_motor_pair_repeat[pair_idx].ccw_time_ms),
+                   ms_to_us(g_motor_pair_repeat[pair_idx].ccw_stop_time_ms),
+                   total_cycles);
+    
+    return AT_OK;
+}
+
+// 停止电机对循环运行
+AtCmdStatus_t MotorCmd_PairStopRepeat(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    int dev_id, pair_num;
+    if (sscanf(params, "%d,%d", &dev_id, &pair_num) != 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证设备ID和电机对号
+    if (dev_id != g_device_id || pair_num < 1 || pair_num > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_num - 1;
+    
+    if (g_motor_pair_repeat[pair_idx].is_running) {
+        // 停止电机对
+        MotorPair_SetState(pair_idx, MOTOR_DIR_STOP, 0, 0, 1);
+        
+        // 返回确认信息
+        AT_SendResponse("AT+MotorPairStopRepeat=%d,%d,1,%d",
+                       dev_id, pair_num, g_motor_pair_repeat[pair_idx].current_cycle);
+        
+        // 清除循环运行状态
+        g_motor_pair_repeat[pair_idx].is_running = 0;
+    } else {
+        AT_SendResponse("AT+MotorPairStopRepeat=%d,%d,0,0", dev_id, pair_num);
+    }
+    
+    return AT_OK;
+}
+
+// 电机对自定义运行命令处理（支持每阶段独立延时）
+AtCmdStatus_t MotorCmd_PairRunCustom(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 解析基本参数
+    char *param_ptr = (char*)params;
+    int dev_id, pair_num, total_period_ms, max_cycles, phase_count;
+    
+    if (sscanf(param_ptr, "%d,%d,%d,%d,%d", &dev_id, &pair_num, 
+               &total_period_ms, &max_cycles, &phase_count) != 5) {
+        return AT_PARAM_ERROR;
+    }
+    
+    // 验证参数
+    if (dev_id != g_device_id || pair_num < 1 || pair_num > 2 || 
+        phase_count < 1 || phase_count > MAX_MOTOR_PAIR_PHASES) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_num - 1;
+    
+    // 移动到阶段参数位置
+    for (int i = 0; i < 5; i++) {
+        param_ptr = strchr(param_ptr, ',');
+        if (param_ptr == NULL) return AT_PARAM_ERROR;
+        param_ptr++;
+    }
+    
+    // 解析各阶段参数（包含负载延时）
+    MotorPairPhase_t phases[MAX_MOTOR_PAIR_PHASES];
+    for (int i = 0; i < phase_count; i++) {
+        int start_time, direction, main_pwm, load_pwm, load_delay;
+        if (sscanf(param_ptr, "%d,%d,%d,%d,%d", &start_time, &direction, &main_pwm, &load_pwm, &load_delay) != 5) {
+            return AT_PARAM_ERROR;
+        }
+        
+        phases[i].start_time_ms = start_time;
+        phases[i].main_direction = (MotorDirection_t)direction;
+        phases[i].main_pwm = main_pwm;
+        phases[i].load_pwm = load_pwm;
+        phases[i].load_delay_ms = load_delay;
+        
+        // 移动到下一组参数
+        for (int j = 0; j < 5 && param_ptr; j++) {
+            param_ptr = strchr(param_ptr, ',');
+            if (param_ptr) param_ptr++;
+        }
+    }
+    
+    // 设置自定义运行参数
+    g_motor_pair_custom[pair_idx].is_running = 1;
+    g_motor_pair_custom[pair_idx].device_id = dev_id;
+    g_motor_pair_custom[pair_idx].pair_num = pair_num;
+    g_motor_pair_custom[pair_idx].total_period_ms = total_period_ms;
+    g_motor_pair_custom[pair_idx].max_cycles = max_cycles;
+    g_motor_pair_custom[pair_idx].current_cycle = 0;
+    g_motor_pair_custom[pair_idx].phase_count = phase_count;
+    g_motor_pair_custom[pair_idx].current_phase = 0;
+    g_motor_pair_custom[pair_idx].cycle_start_time = HAL_GetTick();
+    g_motor_pair_custom[pair_idx].phase_start_time = HAL_GetTick();
+    g_motor_pair_custom[pair_idx].load_applied = 0;
+    
+    // 复制阶段数据
+    for (int i = 0; i < phase_count; i++) {
+        g_motor_pair_custom[pair_idx].phases[i] = phases[i];
+    }
+    
+    // 启动第一阶段（不立即施加负载）
+    MotorPairPhase_t *first_phase = &g_motor_pair_custom[pair_idx].phases[0];
+    MotorPair_SetState(pair_idx, first_phase->main_direction, first_phase->main_pwm, first_phase->load_pwm, 0);
+    
+    // 发送开始消息
+    AT_SendResponse("AT+MotorPairRunCustom=%d,%d,1,%d,%d,%d,0",
+                   dev_id, pair_num, total_period_ms, max_cycles, phase_count);
+    
+    return AT_OK;
+}
+
+// 停止电机对自定义运行
+AtCmdStatus_t MotorCmd_PairStopCustom(const char *params) {
+    if (params == NULL) {
+        return AT_PARAM_ERROR;
+    }
+    
+    int dev_id, pair_num;
+    if (sscanf(params, "%d,%d", &dev_id, &pair_num) != 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    if (dev_id != g_device_id || pair_num < 1 || pair_num > 2) {
+        return AT_PARAM_ERROR;
+    }
+    
+    uint8_t pair_idx = pair_num - 1;
+    
+    if (g_motor_pair_custom[pair_idx].is_running) {
+        // 停止电机对
+        MotorPair_SetState(pair_idx, MOTOR_DIR_STOP, 0, 0, 1);
+        
+        AT_SendResponse("AT+MotorPairStopCustom=%d,%d,1,%d",
+                       dev_id, pair_num, g_motor_pair_custom[pair_idx].current_cycle);
+        
+        g_motor_pair_custom[pair_idx].is_running = 0;
+    } else {
+        AT_SendResponse("AT+MotorPairStopCustom=%d,%d,0,0", dev_id, pair_num);
+    }
+    
+    return AT_OK;
+}
+
+/*******************************************主循环运行函数**************************************/
 // 周期性处理函数 (在主循环中调用)
 // 在MotorCmd_PeriodicHandler函数中添加自定义运行处理逻辑
 // 添加在处理完循环运行后
@@ -1310,7 +1604,180 @@ void MotorCmd_PeriodicHandler(void) {
 		
     } // 结束第一部分的电机控制循环
 
+        // 第三部分：处理电机对循环运行（支持延时负载）
+    for (uint8_t i = 0; i < 2; i++) {
+        if (g_motor_pair_repeat[i].is_running) {
+            uint32_t elapsed = current_time - g_motor_pair_repeat[i].last_switch_time;
+            
+            // 检查是否需要施加负载
+            if (!g_motor_pair_repeat[i].load_applied && 
+                current_time >= g_motor_pair_repeat[i].load_apply_time) {
+                
+                uint16_t load_pwm = (g_motor_pair_repeat[i].current_dir == MOTOR_DIR_CW) ? 
+                                   g_motor_pair_repeat[i].load_pwm_cw : 
+                                   g_motor_pair_repeat[i].load_pwm_ccw;
+                
+                MotorPair_ApplyLoad(i, load_pwm);
+                g_motor_pair_repeat[i].load_applied = 1;
+                
+                // 发送负载施加消息
+                AT_SendResponse("AT+MotorPairLoadApplied=%d,%d,%d,%d",
+                               g_motor_pair_repeat[i].device_id,
+                               g_motor_pair_repeat[i].pair_num,
+                               g_motor_pair_repeat[i].current_dir,
+                               load_pwm);
+            }
+            
+            uint8_t state_changed = 0;
+            
+            switch(g_motor_pair_repeat[i].current_state) {
+                case 0: // 正在正转
+                    if (elapsed >= g_motor_pair_repeat[i].cw_time_ms) {
+                        // 切换到正转停止状态
+                        MotorPair_SetState(i, MOTOR_DIR_STOP, 0, 0, 1);
+                        g_motor_pair_repeat[i].current_state = 1;
+                        g_motor_pair_repeat[i].last_switch_time = current_time;
+                        g_motor_pair_repeat[i].load_applied = 0;  // 重置负载标志
+                        state_changed = 1;
+                    }
+                    break;
+                    
+                case 1: // 正转后停止
+                    if (elapsed >= g_motor_pair_repeat[i].cw_stop_time_ms) {
+                        // 切换到反转状态
+                        MotorPair_SetState(i, MOTOR_DIR_CCW, g_motor_pair_repeat[i].main_pwm, 
+                                         g_motor_pair_repeat[i].load_pwm_ccw, 0);
+                        g_motor_pair_repeat[i].current_state = 2;
+                        g_motor_pair_repeat[i].current_dir = MOTOR_DIR_CCW;
+                        g_motor_pair_repeat[i].last_switch_time = current_time;
+                        g_motor_pair_repeat[i].load_apply_time = current_time + g_motor_pair_repeat[i].load_delay_ms;
+                        g_motor_pair_repeat[i].load_applied = 0;
+                        state_changed = 1;
+                    }
+                    break;
+                    
+                case 2: // 正在反转
+                    if (elapsed >= g_motor_pair_repeat[i].ccw_time_ms) {
+                        // 切换到反转停止状态
+                        MotorPair_SetState(i, MOTOR_DIR_STOP, 0, 0, 1);
+                        g_motor_pair_repeat[i].current_state = 3;
+                        g_motor_pair_repeat[i].last_switch_time = current_time;
+                        g_motor_pair_repeat[i].load_applied = 0;  // 重置负载标志
+                        state_changed = 1;
+                    }
+                    break;
+                    
+                case 3: // 反转后停止
+                    if (elapsed >= g_motor_pair_repeat[i].ccw_stop_time_ms) {
+                        // 完成一个循环
+                        g_motor_pair_repeat[i].current_cycle++;
+                        
+                        AT_SendResponse("AT+MotorPairRunRepeat=%d,%d,1,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+                                       g_motor_pair_repeat[i].device_id,
+                                       g_motor_pair_repeat[i].pair_num,
+                                       g_motor_pair_repeat[i].main_pwm,
+                                       g_motor_pair_repeat[i].load_pwm_cw,
+                                       g_motor_pair_repeat[i].load_pwm_ccw,
+                                       g_motor_pair_repeat[i].load_delay_ms,
+                                       ms_to_us(g_motor_pair_repeat[i].cw_time_ms),
+                                       ms_to_us(g_motor_pair_repeat[i].cw_stop_time_ms),
+                                       ms_to_us(g_motor_pair_repeat[i].ccw_time_ms),
+                                       ms_to_us(g_motor_pair_repeat[i].ccw_stop_time_ms),
+                                       g_motor_pair_repeat[i].max_cycles,
+                                       g_motor_pair_repeat[i].current_cycle);
+                        
+                        // 检查是否达到最大循环次数
+                        if (g_motor_pair_repeat[i].max_cycles > 0 && 
+                            g_motor_pair_repeat[i].current_cycle >= g_motor_pair_repeat[i].max_cycles) {
+                            g_motor_pair_repeat[i].is_running = 0;
+                            MotorPair_SetState(i, MOTOR_DIR_STOP, 0, 0, 1);
+                        } else {
+                            // 开始新循环
+                            MotorPair_SetState(i, MOTOR_DIR_CW, g_motor_pair_repeat[i].main_pwm,
+                                             g_motor_pair_repeat[i].load_pwm_cw, 0);
+                            g_motor_pair_repeat[i].current_state = 0;
+                            g_motor_pair_repeat[i].current_dir = MOTOR_DIR_CW;
+                            g_motor_pair_repeat[i].last_switch_time = current_time;
+                            g_motor_pair_repeat[i].load_apply_time = current_time + g_motor_pair_repeat[i].load_delay_ms;
+                            g_motor_pair_repeat[i].load_applied = 0;
+                            state_changed = 1;
+                        }
+                    }
+                    break;
+            }
+        }
+    }
     
+    // 第四部分：处理电机对自定义运行（支持每阶段延时负载）
+    for (uint8_t i = 0; i < 2; i++) {
+        if (g_motor_pair_custom[i].is_running) {
+            uint32_t cycle_elapsed = current_time - g_motor_pair_custom[i].cycle_start_time;
+            uint32_t phase_elapsed = current_time - g_motor_pair_custom[i].phase_start_time;
+            
+            // 检查当前阶段是否需要施加负载
+            if (!g_motor_pair_custom[i].load_applied && g_motor_pair_custom[i].current_phase < g_motor_pair_custom[i].phase_count) {
+                MotorPairPhase_t *current_phase = &g_motor_pair_custom[i].phases[g_motor_pair_custom[i].current_phase];
+                
+                if (phase_elapsed >= current_phase->load_delay_ms) {
+                    MotorPair_ApplyLoad(i, current_phase->load_pwm);
+                    g_motor_pair_custom[i].load_applied = 1;
+                    
+                    // 发送负载施加消息
+                    AT_SendResponse("AT+MotorPairPhaseLoadApplied=%d,%d,%d,%d,%d",
+                                   g_motor_pair_custom[i].device_id,
+                                   g_motor_pair_custom[i].pair_num,
+                                   g_motor_pair_custom[i].current_phase,
+                                   current_phase->main_direction,
+                                   current_phase->load_pwm);
+                }
+            }
+            
+            // 检查是否完成一个周期
+            if (cycle_elapsed >= g_motor_pair_custom[i].total_period_ms) {
+                g_motor_pair_custom[i].current_cycle++;
+                
+                AT_SendResponse("AT+MotorPairRunCustom=%d,%d,1,%d,%d,%d,%d",
+                               g_motor_pair_custom[i].device_id,
+                               g_motor_pair_custom[i].pair_num,
+                               g_motor_pair_custom[i].total_period_ms,
+                               g_motor_pair_custom[i].max_cycles,
+                               g_motor_pair_custom[i].phase_count,
+                               g_motor_pair_custom[i].current_cycle);
+                
+                // 检查是否达到最大循环次数
+                if (g_motor_pair_custom[i].max_cycles > 0 && 
+                    g_motor_pair_custom[i].current_cycle >= g_motor_pair_custom[i].max_cycles) {
+                    g_motor_pair_custom[i].is_running = 0;
+                    MotorPair_SetState(i, MOTOR_DIR_STOP, 0, 0, 1);
+                } else {
+                    // 开始新周期
+                    g_motor_pair_custom[i].cycle_start_time = current_time;
+                    g_motor_pair_custom[i].phase_start_time = current_time;
+                    g_motor_pair_custom[i].current_phase = 0;
+                    g_motor_pair_custom[i].load_applied = 0;
+                    
+                    MotorPairPhase_t *first_phase = &g_motor_pair_custom[i].phases[0];
+                    MotorPair_SetState(i, first_phase->main_direction, first_phase->main_pwm, first_phase->load_pwm, 0);
+                }
+            } else {
+                // 检查是否需要切换到下一阶段
+                uint8_t next_phase = g_motor_pair_custom[i].current_phase + 1;
+                if (next_phase < g_motor_pair_custom[i].phase_count) {
+                    MotorPairPhase_t *phase = &g_motor_pair_custom[i].phases[next_phase];
+                    if (cycle_elapsed >= phase->start_time_ms) {
+                        MotorPair_SetState(i, phase->main_direction, phase->main_pwm, phase->load_pwm, 0);
+                        g_motor_pair_custom[i].current_phase = next_phase;
+                        g_motor_pair_custom[i].phase_start_time = current_time;
+                        g_motor_pair_custom[i].load_applied = 0;  // 新阶段重置负载标志
+                    }
+                }
+            }
+        }
+	}
+	
+	
+	
+	
 }
 
 // 函数结束

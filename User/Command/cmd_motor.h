@@ -9,7 +9,8 @@
 
 // 最大支持的自定义阶段数
 #define MAX_CUSTOM_PHASES 20
-
+// 最大支持的自定义阶段数,电机对
+#define MAX_MOTOR_PAIR_PHASES 8
 
 
 // 电机方向定义
@@ -64,6 +65,58 @@ typedef struct {
     MotorDirection_t direction; // 运行方向
     uint16_t pwm;               // PWM值
 } MotorPhase_t;
+
+
+
+/**************************成对电机控制***************************************/
+
+// 电机对控制状态
+typedef struct {
+    uint8_t is_running;                 // 是否正在运行
+    uint16_t main_pwm;                  // 主电机PWM值
+    uint16_t load_pwm_cw;              // 正转时负载电机PWM值
+    uint16_t load_pwm_ccw;             // 反转时负载电机PWM值
+    uint32_t load_delay_ms;            // 负载延时时间(毫秒)
+    uint32_t cw_time_ms;               // 正转持续时间
+    uint32_t cw_stop_time_ms;          // 正转后停止时间
+    uint32_t ccw_time_ms;              // 反转持续时间
+    uint32_t ccw_stop_time_ms;         // 反转后停止时间
+    uint32_t max_cycles;               // 最大循环次数(0=无限循环)
+    uint32_t current_cycle;            // 当前已完成循环数
+    uint32_t last_switch_time;         // 最后一次状态切换时间
+    uint32_t load_apply_time;          // 负载施加时间
+    MotorDirection_t current_dir;      // 当前方向
+    uint8_t current_state;             // 当前状态(0=正转, 1=正转停止, 2=反转, 3=反转停止)
+    uint8_t load_applied;              // 负载是否已施加标志
+    uint16_t device_id;                // 设备ID
+    uint8_t pair_num;                  // 电机对编号(1或2)
+} MotorPairControl_t;
+
+// 电机对自定义阶段结构
+typedef struct {
+    uint32_t start_time_ms;            // 阶段开始时间(相对于周期开始)
+    MotorDirection_t main_direction;   // 主电机方向
+    uint16_t main_pwm;                 // 主电机PWM值
+    uint16_t load_pwm;                 // 负载电机PWM值
+    uint32_t load_delay_ms;            // 该阶段的负载延时
+} MotorPairPhase_t;
+
+// 电机对自定义运行状态
+typedef struct {
+    uint8_t is_running;                // 是否正在运行
+    uint16_t device_id;                // 设备ID
+    uint8_t pair_num;                  // 电机对编号
+    uint32_t total_period_ms;          // 总周期时间
+    uint32_t max_cycles;               // 最大循环次数
+    uint32_t current_cycle;            // 当前循环次数
+    uint8_t phase_count;               // 阶段数量
+    uint8_t current_phase;             // 当前阶段
+    uint32_t cycle_start_time;         // 当前周期开始时间
+    uint32_t phase_start_time;         // 当前阶段开始时间
+    uint8_t load_applied;              // 当前阶段负载是否已施加
+    MotorPairPhase_t phases[MAX_MOTOR_PAIR_PHASES]; // 最多8个阶段
+} MotorPairCustom_t;
+
 
 
 // 添加初始化函数声明
@@ -143,6 +196,12 @@ AtCmdStatus_t MotorCmd_SetSpeedPID(const char *params);
 AtCmdStatus_t MotorCmd_QueryControlStatus(const char *params);
 // 电机使能/禁用命令: AT+MotorEnable=设备ID,电机号,使能状态
 AtCmdStatus_t MotorCmd_SetEnable(const char *params);
+
+// 新增的电机对控制命令
+AtCmdStatus_t MotorCmd_PairRunRepeat(const char *params);
+AtCmdStatus_t MotorCmd_PairStopRepeat(const char *params);
+AtCmdStatus_t MotorCmd_PairRunCustom(const char *params);
+AtCmdStatus_t MotorCmd_PairStopCustom(const char *params);
 
 
 // 周期性处理函数 (在主循环中调用)

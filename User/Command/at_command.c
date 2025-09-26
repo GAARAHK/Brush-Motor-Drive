@@ -313,6 +313,25 @@ AtCmdStatus_t AT_ProcessCommand(char *cmd) {
             return MotorCmd_StopCustom(param_start);
         }
 		
+		
+		else if (strcmp(cmd_name, "MotorPairRunRepeat") == 0) {
+            return MotorCmd_PairRunRepeat(param_start);
+        }
+        else if (strcmp(cmd_name, "MotorPairStopRepeat") == 0) {
+            return MotorCmd_PairStopRepeat(param_start);
+        }
+        else if (strcmp(cmd_name, "MotorPairRunCustom") == 0) {
+            return MotorCmd_PairRunCustom(param_start);
+        }
+        else if (strcmp(cmd_name, "MotorPairStopCustom") == 0) {
+            return MotorCmd_PairStopCustom(param_start);
+        }
+		
+		
+		
+		
+		
+		
 		//换气阀开始命令
 		else if (strcmp(cmd_name, "HuanQi_Start") == 0) {
             return HuanQi_Start(param_start);
