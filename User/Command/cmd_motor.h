@@ -10,6 +10,32 @@
 // 最大支持的自定义阶段数
 #define MAX_CUSTOM_PHASES 20
 
+// 电机对控制结构
+typedef struct {
+    uint8_t pair_id;                    // 电机对ID (1 or 2)
+    uint8_t is_running;                 // 是否运行中
+    uint32_t start_time;                // 启动时间
+    
+    // 循环运行参数
+    uint16_t pwm;                       // PWM值
+    uint32_t cw_time_ms;                // 正转持续时间
+    uint32_t cw_stop_time_ms;           // 正转后停止时间
+    uint32_t ccw_time_ms;               // 反转持续时间
+    uint32_t ccw_stop_time_ms;          // 反转后停止时间
+    uint32_t max_cycles;                // 最大循环次数(0=无限循环)
+    uint32_t current_cycle;             // 当前已完成循环数
+    uint32_t last_switch_time;          // 最后一次状态切换时间
+    MotorDirection_t current_dir;       // 当前方向
+    uint8_t current_state;              // 当前状态(0=正转, 1=正转停止, 2=反转, 3=反转停止)
+    
+    // 自定义运行参数
+    uint32_t total_period_ms;           // 总周期时间
+    uint8_t phase_count;                // 阶段数量
+    MotorPhase_t phases[MAX_MOTOR_PAIR_PHASES]; // 阶段数组
+    uint8_t current_phase;              // 当前阶段索引
+    uint32_t cycle_start_time;          // 当前周期开始时间
+} MotorPairControl_t;
+
 
 
 // 电机方向定义
@@ -144,6 +170,11 @@ AtCmdStatus_t MotorCmd_QueryControlStatus(const char *params);
 // 电机使能/禁用命令: AT+MotorEnable=设备ID,电机号,使能状态
 AtCmdStatus_t MotorCmd_SetEnable(const char *params);
 
+// 电机对控制命令
+AtCmdStatus_t MotorCmd_PairRunRepeat(const char *params);
+AtCmdStatus_t MotorCmd_PairStopRepeat(const char *params);
+AtCmdStatus_t MotorCmd_PairRunCustom(const char *params);
+AtCmdStatus_t MotorCmd_PairStopCustom(const char *params);
 
 // 周期性处理函数 (在主循环中调用)
 void MotorCmd_PeriodicHandler(void);

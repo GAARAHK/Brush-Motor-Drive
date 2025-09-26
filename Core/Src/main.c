@@ -195,6 +195,12 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  
       AT_MainLoopHandler();
+      
+      // 电机命令模块周期性处理
+      MotorCmd_PeriodicHandler();
+      
+      // 软启动状态更新
+      DRV8870_SoftStartUpdate();
 	  
 	   // 每500ms输出一次电机状态
 //        static uint32_t last_print = 0;
