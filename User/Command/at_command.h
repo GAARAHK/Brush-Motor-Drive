@@ -18,8 +18,8 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 // 缓冲区大小定义
-#define AT_RX_BUFFER_SIZE     512  // 接收缓冲区大小
-#define AT_CMD_MAX_LEN        256  // 最大命令长度
+#define AT_RX_BUFFER_SIZE     1024  // 接收缓冲区大小
+#define AT_CMD_MAX_LEN        1024  // 最大命令长度
 #define AT_TX_BUFFER_SIZE     256  // 发送缓冲区大小
 #define AT_TX_QUEUE_SIZE      32   // 发送队列大小
 

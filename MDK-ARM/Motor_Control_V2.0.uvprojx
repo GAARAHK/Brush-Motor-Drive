@@ -336,7 +336,7 @@
               <MiscControls>--locale=english</MiscControls>
               <Define>USE_HAL_DRIVER,STM32F334x8</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32F3xx_HAL_Driver/Inc;../Drivers/STM32F3xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F3xx/Include;../Drivers/CMSIS/Include;../User/Command;../User/Drivers/current_sense;../User/Drivers/drv8870;../User/Utils;../User/ratation_control;../User/Drivers/motor_control;../User/Drivers/hall_speed;..\User\Flash</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32F3xx_HAL_Driver/Inc;../Drivers/STM32F3xx_HAL_Driver/Inc/Legacy;../Drivers/CMSIS/Device/ST/STM32F3xx/Include;../Drivers/CMSIS/Include;../User/Command;../User/Drivers/current_sense;../User/Drivers/drv8870;../User/Utils;../User/ratation_control;../User/Drivers/motor_control;../User/Drivers/hall_speed;../User/Flash</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>

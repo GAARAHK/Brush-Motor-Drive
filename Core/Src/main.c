@@ -182,6 +182,25 @@ int main(void)
     // 启动电流环定时器
     //HAL_TIM_Base_Start_IT(&htim6);
 	
+	// 配置软启动参数（可选）
+    SoftStart_Config_t soft_config = {
+        .ramp_time_ms = 800,  // 800ms软启动时间
+        .step_count = 25,     // 25个步骤
+        .enabled = 1          // 启用软启动
+    };
+    
+    // 为所有电机设置软启动配置
+    for (uint8_t i = 0; i < 4; i++) {
+        MTD_SetSoftStartConfig(i, soft_config);
+    }
+    
+    LOG_INFO("Soft start initialized for all motors (800ms ramp time)\r\n");
+	
+	// 初始化四个电机的直接换相保护：检测到正反直接换相时，先滑行再软起动
+// 这里设置4个电机统一滑行2秒，你也可以按电机分别设置不同时间
+	for (uint8_t i = 0; i < 4; i++) {
+		MTD_SetDirectionChangeDelay(i, 2000);  // 2s 滑行
+	}
 	
 
   /* USER CODE END 2 */
@@ -195,7 +214,8 @@ int main(void)
     /* USER CODE BEGIN 3 */
 	  
       AT_MainLoopHandler();
-	  
+	   // 处理软启动更新（需要定期调用）
+      MTD_ProcessSoftStart();
 	   // 每500ms输出一次电机状态
 //        static uint32_t last_print = 0;
 //        if (HAL_GetTick() - last_print > 1000) {

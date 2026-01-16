@@ -22,12 +22,232 @@ Dialog DLL:      TCM.DLL V1.32.0.0
  
 <h2>Project:</h2>
 D:\STM32CubeProject\Motor_Control_V2.0 - huanqifa\Motor_Control_V2.0\MDK-ARM\Motor_Control_V2.0.uvprojx
-Project File Date:  09/11/2025
+Project File Date:  01/15/2026
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 5 (build 528)', folder: 'D:\Keil5\ARM\ARMCC\Bin'
 Build target 'Motor_Control_V2.0'
-"Motor_Control_V2.0\Motor_Control_V2.0" - 0 Error(s), 0 Warning(s).
+assembling startup_stm32f334x8.s...
+compiling dma.c...
+compiling stm32f3xx_hal_gpio.c...
+compiling gpio.c...
+compiling stm32f3xx_hal_msp.c...
+compiling usart.c...
+compiling stm32f3xx_hal_rcc_ex.c...
+compiling main.c...
+../User/Drivers/drv8870/drv8870.h(81): warning:  #1-D: last line of file ends without a newline
+  #endif // DRV8870_H
+../User/Drivers/current_sense/currentsense.h(79): warning:  #1-D: last line of file ends without a newline
+  #endif // CURRENT_SENSE_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+../User/Command/at_command.h(71): warning:  #1-D: last line of file ends without a newline
+  #endif /* AT_COMMAND_H */
+../User/Drivers/hall_speed/speed_sensor.h(54): warning:  #1-D: last line of file ends without a newline
+  #endif // SPEED_SENSOR_H
+../User/Drivers/motor_control/motor_control.h(89): warning:  #1-D: last line of file ends without a newline
+  #endif // MOTOR_CONTROL_H
+../User/Command/cmd_motor.h(210): warning:  #1-D: last line of file ends without a newline
+  #endif // CMD_MOTOR_H
+../Core/Src/main.c(48): warning:  #1295-D: Deprecated declaration Init_SpeedControl - give arg types
+  extern void Init_SpeedControl();
+../Core/Src/main.c: 8 warnings, 0 errors
+compiling stm32f3xx_it.c...
+../User/Drivers/current_sense/currentsense.h(79): warning:  #1-D: last line of file ends without a newline
+  #endif // CURRENT_SENSE_H
+../User/Command/at_command.h(71): warning:  #1-D: last line of file ends without a newline
+  #endif /* AT_COMMAND_H */
+../User/Drivers/hall_speed/speed_sensor.h(54): warning:  #1-D: last line of file ends without a newline
+  #endif // SPEED_SENSOR_H
+../Core/Src/stm32f3xx_it.c: 3 warnings, 0 errors
+compiling stm32f3xx_hal_rcc.c...
+compiling stm32f3xx_hal.c...
+compiling stm32f3xx_hal_adc.c...
+compiling adc.c...
+compiling stm32f3xx_hal_dma.c...
+compiling tim.c...
+compiling cmd_parser.c...
+..\User\Command\cmd_parser.h(15): warning:  #1-D: last line of file ends without a newline
+  #endif // CMD_PARSER_H
+..\User\Command\cmd_parser.c(78): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Command\cmd_parser.c: 2 warnings, 0 errors
+compiling stm32f3xx_hal_adc_ex.c...
+compiling stm32f3xx_hal_pwr_ex.c...
+compiling system_stm32f3xx.c...
+compiling cmd_motor.c...
+..\User\Command\at_command.h(71): warning:  #1-D: last line of file ends without a newline
+  #endif /* AT_COMMAND_H */
+..\User\Command\cmd_motor.h(210): warning:  #1-D: last line of file ends without a newline
+  #endif // CMD_MOTOR_H
+..\User\Command\cmd_parser.h(15): warning:  #1-D: last line of file ends without a newline
+  #endif // CMD_PARSER_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+../User/Drivers/drv8870/drv8870.h(81): warning:  #1-D: last line of file ends without a newline
+  #endif // DRV8870_H
+../User/Drivers/current_sense/currentsense.h(79): warning:  #1-D: last line of file ends without a newline
+  #endif // CURRENT_SENSE_H
+../User/Drivers/hall_speed/speed_sensor.h(54): warning:  #1-D: last line of file ends without a newline
+  #endif // SPEED_SENSOR_H
+../User/Drivers/motor_control/motor_control.h(89): warning:  #1-D: last line of file ends without a newline
+  #endif // MOTOR_CONTROL_H
+../User/Flash/flash_storage.h(19): warning:  #1-D: last line of file ends without a newline
+  #endif // FLASH_STORAGE_H
+..\User\Command\cmd_motor.c(67): warning:  #188-D: enumerated type mixed with another type
+  } g_motor_run[4] = {0};
+..\User\Command\cmd_motor.c(286): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d,%d,%d", &dev_id, &motor_num, &direction, &pwm, &runtime_us) != 5) {
+..\User\Command\cmd_motor.c(312): warning:  #188-D: enumerated type mixed with another type
+      g_motor_run[motor_idx].direction = direction;
+..\User\Command\cmd_motor.c(319): warning:  #188-D: enumerated type mixed with another type
+      Motor_SetState(motor_idx, direction, pwm);
+..\User\Command\cmd_motor.c(340): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &motor_num) != 2) {
+..\User\Command\cmd_motor.c(376): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &motor_num) != 2) {
+..\User\Command\cmd_motor.c(404): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d", &dev_id, &motor_num, &period_ms) != 3) {
+..\User\Command\cmd_motor.c(441): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &motor_num) != 2) {
+..\User\Command\cmd_motor.c(473): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d", &dev_id) != 1) {
+..\User\Command\cmd_motor.c(501): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d", &dev_id, &motor_num, &type) != 3) {
+..\User\Command\cmd_motor.c(539): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d,%d,%d", &dev_id, &motor_num, &overvoltage, &undervoltage, &overcurrent) != 5) {
+..\User\Command\cmd_motor.c(576): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d,%d,%d,%d,%d,%d", &dev_id, &motor_num, &pwm, &cw_time_us, 
+..\User\Command\cmd_motor.c(637): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &motor_num) != 2) {
+..\User\Command\cmd_motor.c(701): warning:  #223-D: function "sscanf" declared implicitly
+      int result = sscanf(params, "%d,%d,%d,%d,%d", 
+..\User\Command\cmd_motor.c(832): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &motor_num) != 2) {
+..\User\Command\cmd_motor.c(877): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d", &cycles) != 1) {
+..\User\Command\cmd_motor.c(933): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d,%f", &dev_id, &motor_num, &poles, &filter_alpha) != 4) {
+..\User\Command\cmd_motor.c(977): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d", &dev_id, &motor_num, &mode) != 3) {
+..\User\Command\cmd_motor.c(1009): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d", &dev_id, &motor_num, &current_ma) != 3) {
+..\User\Command\cmd_motor.c(1040): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d", &dev_id, &motor_num, &speed_rpm) != 3) {
+..\User\Command\cmd_motor.c(1071): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%f,%f,%f", &dev_id, &motor_num, &kp, &ki, &kd) != 5) {
+..\User\Command\cmd_motor.c(1100): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%f,%f,%f", &dev_id, &motor_num, &kp, &ki, &kd) != 5) {
+..\User\Command\cmd_motor.c(1128): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &motor_num) != 2) {
+..\User\Command\cmd_motor.c(1162): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d", &dev_id, &motor_num, &enable) != 3) {
+..\User\Command\cmd_motor.c(1200): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d", &dev_id, &pair_num, &main_pwm, 
+..\User\Command\cmd_motor.c(1280): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &pair_num) != 2) {
+..\User\Command\cmd_motor.c(1318): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(param_ptr, "%d,%d,%d,%d,%d", &dev_id, &pair_num, 
+..\User\Command\cmd_motor.c(1342): warning:  #223-D: function "sscanf" declared implicitly
+          if (sscanf(param_ptr, "%d,%d,%d,%d,%d", &start_time, &direction, &main_pwm, &load_pwm, &load_delay) != 5) {
+..\User\Command\cmd_motor.c(1395): warning:  #223-D: function "sscanf" declared implicitly
+      if (sscanf(params, "%d,%d", &dev_id, &pair_num) != 2) {
+..\User\Command\cmd_motor.c(1451): warning:  #550-D: variable "state_changed"  was set but never used
+                  uint8_t state_changed = 0;
+..\User\Command\cmd_motor.c(1631): warning:  #550-D: variable "state_changed"  was set but never used
+              uint8_t state_changed = 0;
+..\User\Command\cmd_motor.c(1783): warning:  #1-D: last line of file ends without a newline
+  // ????????????
+..\User\Command\cmd_motor.c: 41 warnings, 0 errors
+compiling stm32f3xx_hal_cortex.c...
+compiling stm32f3xx_hal_exti.c...
+compiling stm32f3xx_hal_uart.c...
+compiling stm32f3xx_hal_uart_ex.c...
+compiling stm32f3xx_hal_tim_ex.c...
+compiling stm32f3xx_hal_flash_ex.c...
+compiling stm32f3xx_hal_flash.c...
+compiling stm32f3xx_hal_pwr.c...
+compiling at_command.c...
+..\User\Command\at_command.h(71): warning:  #1-D: last line of file ends without a newline
+  #endif /* AT_COMMAND_H */
+..\User\Command\cmd_motor.h(210): warning:  #1-D: last line of file ends without a newline
+  #endif // CMD_MOTOR_H
+..\User\Command\cmd_parser.h(15): warning:  #1-D: last line of file ends without a newline
+  #endif // CMD_PARSER_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+..\User\Command\at_command.c(429): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Command\at_command.c: 5 warnings, 0 errors
+compiling stm32f3xx_hal_i2c_ex.c...
+compiling stm32f3xx_hal_i2c.c...
+compiling stm32f3xx_hal_tim.c...
+compiling flash_storage.c...
+..\User\Flash\flash_storage.h(19): warning:  #1-D: last line of file ends without a newline
+  #endif // FLASH_STORAGE_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+..\User\Flash\flash_storage.c(173): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Flash\flash_storage.c: 3 warnings, 0 errors
+compiling speed_sensor.c...
+..\User\Drivers\hall_speed\speed_sensor.h(54): warning:  #1-D: last line of file ends without a newline
+  #endif // SPEED_SENSOR_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+../User/Drivers/drv8870/drv8870.h(81): warning:  #1-D: last line of file ends without a newline
+  #endif // DRV8870_H
+../User/Drivers/current_sense/currentsense.h(79): warning:  #1-D: last line of file ends without a newline
+  #endif // CURRENT_SENSE_H
+../User/Drivers/motor_control/motor_control.h(89): warning:  #1-D: last line of file ends without a newline
+  #endif // MOTOR_CONTROL_H
+..\User\Drivers\hall_speed\speed_sensor.c(175): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Drivers\hall_speed\speed_sensor.c: 6 warnings, 0 errors
+compiling rotation_control.c...
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+..\User\ratation_control\rotation_control.c: 1 warning, 0 errors
+compiling log.c...
+..\User\Utils\log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+..\User\Utils\log.c(28): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Utils\log.c: 2 warnings, 0 errors
+compiling motor_control.c...
+../User/Drivers/drv8870/drv8870.h(81): warning:  #1-D: last line of file ends without a newline
+  #endif // DRV8870_H
+../User/Drivers/current_sense/currentsense.h(79): warning:  #1-D: last line of file ends without a newline
+  #endif // CURRENT_SENSE_H
+../User/Drivers/hall_speed/speed_sensor.h(54): warning:  #1-D: last line of file ends without a newline
+  #endif // SPEED_SENSOR_H
+..\User\Drivers\motor_control\motor_control.h(89): warning:  #1-D: last line of file ends without a newline
+  #endif // MOTOR_CONTROL_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+..\User\Drivers\motor_control\motor_control.c(426): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Drivers\motor_control\motor_control.c(293): warning:  #177-D: function "EstimateSpeed"  was declared but never referenced
+  static float EstimateSpeed(uint8_t motor_idx) {
+..\User\Drivers\motor_control\motor_control.c: 7 warnings, 0 errors
+compiling drv8870.c...
+..\User\Drivers\drv8870\drv8870.h(81): warning:  #1-D: last line of file ends without a newline
+  #endif // DRV8870_H
+..\User\Drivers\drv8870\drv8870.c(310): warning:  #223-D: function "abs" declared implicitly
+                                     (abs(speed_diff) / state->config.step_count + 1) : 1;
+..\User\Drivers\drv8870\drv8870.c(335): warning:  #1-D: last line of file ends without a newline
+  }
+..\User\Drivers\drv8870\drv8870.c: 3 warnings, 0 errors
+compiling currentsense.c...
+..\User\Drivers\current_sense\currentsense.h(79): warning:  #1-D: last line of file ends without a newline
+  #endif // CURRENT_SENSE_H
+../User/Utils/log.h(38): warning:  #1-D: last line of file ends without a newline
+  #endif // USER_LOG_H
+..\User\Drivers\current_sense\currentsense.c: 2 warnings, 0 errors
+linking...
+Program Size: Code=38252 RO-data=1344 RW-data=140 ZI-data=6668  
+FromELF: creating hex file...
+"Motor_Control_V2.0\Motor_Control_V2.0" - 0 Error(s), 83 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -50,7 +270,7 @@ Package Vendor: Keil
 <h2>Collection of Component Files used:</h2>
 
    * Component: ARM::CMSIS:CORE:5.0.1
-Build Time Elapsed:  00:00:01
+Build Time Elapsed:  00:00:39
 </pre>
 </body>
 </html>

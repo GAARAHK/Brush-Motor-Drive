@@ -135,6 +135,26 @@ void AT_UART_IdleCallback(UART_HandleTypeDef *huart) {
     }
 }
 
+//串口错误回调
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart == at_uart) // 判断是哪个串口
+    {
+        // 1. 读取状态寄存器和数据寄存器以清除错误标志 (具体清除方式视芯片系列而定，通常读 SR 和 DR 即可)
+        // 对于较新的 HAL 库，__HAL_UART_CLEAR_FLAG 宏或直接调用接收启动函数通常会自动处理
+        // 清除可能的错误标志
+    __HAL_UART_CLEAR_FLAG(huart, UART_CLEAR_OREF | UART_CLEAR_NEF | 
+                                     UART_CLEAR_PEF | UART_CLEAR_FEF);
+        // 2. 必须重新开启接收中断，否则后续无法接收数据
+        //HAL_UART_Receive_IT(huart, &rx_buffer, 1); 
+        // 或者如果你用的是 DMA
+        // HAL_UART_Receive_DMA(huart, &rx_buffer, length);
+		 // 暂停DMA接收
+        HAL_StatusTypeDef status = HAL_UART_DMAStop(huart);
+		// 重新启动DMA接收
+        status = HAL_UART_Receive_DMA(huart, at_rx_buffer, AT_RX_BUFFER_SIZE);
+    }
+}
 
 /**
   * @brief  UART DMA 接收完成回调

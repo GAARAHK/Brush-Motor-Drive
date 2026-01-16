@@ -10,7 +10,7 @@
 // 最大支持的自定义阶段数
 #define MAX_CUSTOM_PHASES 20
 // 最大支持的自定义阶段数,电机对
-#define MAX_MOTOR_PAIR_PHASES 8
+#define MAX_MOTOR_PAIR_PHASES 20
 
 
 // 电机方向定义
@@ -114,7 +114,7 @@ typedef struct {
     uint32_t cycle_start_time;         // 当前周期开始时间
     uint32_t phase_start_time;         // 当前阶段开始时间
     uint8_t load_applied;              // 当前阶段负载是否已施加
-    MotorPairPhase_t phases[MAX_MOTOR_PAIR_PHASES]; // 最多8个阶段
+    MotorPairPhase_t phases[MAX_MOTOR_PAIR_PHASES]; // 最多个阶段
 } MotorPairCustom_t;
 
 

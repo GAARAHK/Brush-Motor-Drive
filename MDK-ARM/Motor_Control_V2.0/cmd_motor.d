@@ -48,4 +48,4 @@ motor_control_v2.0\cmd_motor.o: ../Core/Inc/main.h
 motor_control_v2.0\cmd_motor.o: ../User/Drivers/motor_control/motor_control.h
 motor_control_v2.0\cmd_motor.o: ../User/Drivers/hall_speed/speed_sensor.h
 motor_control_v2.0\cmd_motor.o: ../Core/Inc/tim.h
-motor_control_v2.0\cmd_motor.o: ..\User\Flash\flash_storage.h
+motor_control_v2.0\cmd_motor.o: ../User/Flash/flash_storage.h
